@@ -1,2 +1,3 @@
-.o
-main
+*.o
+simple_shell
+.421sh

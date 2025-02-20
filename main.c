@@ -13,12 +13,14 @@ description: a simple linux shell designed to perform basic linux commands
 #include <unistd.h>
 #include <sys/wait.h>
 #include <ctype.h>
-#include <stdbool.h>
+#include <signal.h>
 #include "utils.h"
+#include "history_utils.h"
 
 #define GETLINE_FAILURE -1
 #define EXIT_CMD "exit"
 #define PROC_CMD "/proc"
+#define HISTORY_CMD "history"
 
 
 /*
@@ -28,9 +30,11 @@ create a simple linux shell interface to perform basic linux commands
 
 
 // DEFINE THE FUNCTION PROTOTYPES
-void user_prompt_loop();
-char* get_user_command();
+void user_prompt_loop(void);
+char* get_user_command(void);
 char** parse_command(char*);
+void tear_down(void);
+void handle_sigint(int);
 // execute_command()
 
 
@@ -42,6 +46,11 @@ int main(int argc, char **argv) {
     otherwise call the user_prompt_loop() function to get user input repeatedly 
     until the user enters the "exit" command.
     */
+
+    // Set Ctrl+C (SIGINT) signal interrupt handler.
+    if (signal(SIGINT, handle_sigint) == SIG_ERR) {
+        fprintf(stderr, "Error setting Ctrl+C signal handler\n");
+    }
 
     // Check for command-line arguments.
     if (argc > 1) {
@@ -57,80 +66,118 @@ int main(int argc, char **argv) {
 }
 
 
+void tear_down() {
+    // Clear command history and exit cleanly.
+    if (clear_history() == CLEAR_FAILURE) {
+        fprintf(stderr, "Error clearing history file.\n");
+        exit(1);
+    }
+    exit(0);
+}
+
+
+void handle_sigint(int sig) {
+    // Handle Ctrl+C (SIGINT) signal.
+    printf("Interrupt ignored. Type `exit` to quit.\n$ ");
+    fflush(stdout);
+}
+
+
 
 void user_prompt_loop() {
     char* cmd = "";
     
-    while (true) {
-        printf(">> ");
+    while (1) {
+        printf("$ ");
         cmd = get_user_command(); // needs free()
         char** parsed_cmd = parse_command(cmd); // needs free()
 
-        // First argument is "exit".
-        if (strcmp(parsed_cmd[0], EXIT_CMD) == 0) {
-            if (parsed_cmd[1] != NULL) {
-                // Invalid exit command.
-                fprintf(stderr, "Usage: exit\tAdditional arguments are not supported.\n");
-            } else {
-                // Valid exit command.
-                free(cmd);
-                for (int i = 0; parsed_cmd[i] != NULL; i++) {
-                    free(parsed_cmd[i]);
+        if (parsed_cmd != NULL) {        
+            // First argument is "exit".
+            if (strcmp(parsed_cmd[0], EXIT_CMD) == 0) {
+                if (parsed_cmd[1] != NULL) {
+                    // Invalid exit command.
+                    fprintf(stderr, "Usage: exit\tAdditional arguments are not supported.\n");
+                } else {
+                    // Valid exit command.
+                    free(cmd);
+                    for (int i = 0; parsed_cmd[i] != NULL; i++) {
+                        free(parsed_cmd[i]);
+                    }
+                    free(parsed_cmd);
+                    tear_down();
                 }
-                free(parsed_cmd);
-                exit(0);
             }
-        }
 
-        // First argument is "/proc"
-        if (strcmp(parsed_cmd[0], PROC_CMD) == 0) {
-            if (parsed_cmd[1] == NULL) {
-                // Invalid /proc command.
-                fprintf(stderr, "Usage: /proc /[filepath]\tNot enough arguments.\n");
-            } else {
-                // Valid /proc command.
+            // First argument is "/proc".
+            if (strcmp(parsed_cmd[0], PROC_CMD) == 0) {
+                if (parsed_cmd[1] == NULL) {
+                    // Invalid /proc command.
+                    fprintf(stderr, "Usage: /proc /[filepath]\tNot enough arguments.\n");
+                } else {
+                    // Valid /proc command.
+                }
             }
+
+            // First argument is "history".
+            if (strcmp(parsed_cmd[0], HISTORY_CMD) == 0) {
+                if (parsed_cmd[1] != NULL) {
+                    // Invalid history command.
+                    fprintf(stderr, "Usage: history\tAdditional arguments are not supported.\n");
+                } else {
+                    // Valid history command. Check for successsful execution.
+                    if (print_history() == PRINT_FAILURE) {
+                        fprintf(stderr, "Error printing command history.\n");
+                    }
+                }
+            }
+
+
+
+                // 5. if the first element is "/proc" then you have the open the /proc file system 
+                //    to read from it
+                //     i) concat the full command:
+                //         Ex: user input >>/proc /process_id_no/status
+                //             concated output: /proc/process_id_no/status
+                //     ii) read from the file line by line. you may user fopen() and getline() functions
+                //     iii) display the following information according to the user input from /proc
+                //         a) Get the cpu information if the input is /proc/cpuinfo
+                //         - Cpu Mhz
+                //         - Cache size
+                //         - Cpu cores
+                //         - Address sizes
+                //         b) Get the number of currently running processes from /proc/loadavg
+                //         c) Get how many seconds your box has been up, and how many seconds it has been idle from /proc/uptime
+                //         d) Get the following information from /proc/process_id_no/status
+                //         - the vm size of the virtual memory allocated the vbox 
+                //         - the most memory used vmpeak 
+                //         - the process state
+                //         - the parent pid
+                //         - the number of threads
+                //         - number of voluntary context switches
+                //         - number of involuntary context switches
+                //         e) display the list of environment variables from /proc/process_id_no/environ
+                //         f) display the performance information if the user input is /proc/process_id_no/sched
+                // 7. otherwise pass the parsed command to execute_command() function 
+        
+            /*
+            Functions you may need: 
+                get_user_command(), parse_command(), execute_command(), strcmp(), strcat(), 
+                strlen(), strncmp(), fopen(), fclose(), getline(), isdigit(), atoi(), fgetc(), 
+                or any other useful functions
+            */
+            
+            // Append latest command to history file.
+            if (append_history(cmd) == APPEND_FAILURE) {
+                fprintf(stderr, "Error appending to history file\n");
+            }
+
+            for (int i = 0; parsed_cmd[i] != NULL; i++) {
+                free(parsed_cmd[i]);
+            }
+            free(parsed_cmd);
         }
-
-
-            // 5. if the first element is "/proc" then you have the open the /proc file system 
-            //    to read from it
-            //     i) concat the full command:
-            //         Ex: user input >>/proc /process_id_no/status
-            //             concated output: /proc/process_id_no/status
-            //     ii) read from the file line by line. you may user fopen() and getline() functions
-            //     iii) display the following information according to the user input from /proc
-            //         a) Get the cpu information if the input is /proc/cpuinfo
-            //         - Cpu Mhz
-            //         - Cache size
-            //         - Cpu cores
-            //         - Address sizes
-            //         b) Get the number of currently running processes from /proc/loadavg
-            //         c) Get how many seconds your box has been up, and how many seconds it has been idle from /proc/uptime
-            //         d) Get the following information from /proc/process_id_no/status
-            //         - the vm size of the virtual memory allocated the vbox 
-            //         - the most memory used vmpeak 
-            //         - the process state
-            //         - the parent pid
-            //         - the number of threads
-            //         - number of voluntary context switches
-            //         - number of involuntary context switches
-            //         e) display the list of environment variables from /proc/process_id_no/environ
-            //         f) display the performance information if the user input is /proc/process_id_no/sched
-            // 7. otherwise pass the parsed command to execute_command() function 
-    
-        /*
-        Functions you may need: 
-            get_user_command(), parse_command(), execute_command(), strcmp(), strcat(), 
-            strlen(), strncmp(), fopen(), fclose(), getline(), isdigit(), atoi(), fgetc(), 
-            or any other useful functions
-        */
-    
        free(cmd);
-       for (int i = 0; parsed_cmd[i] != NULL; i++) {
-           free(parsed_cmd[i]);
-       }
-       free(parsed_cmd);
     }
 }
 
