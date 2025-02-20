@@ -6,7 +6,7 @@ TARGET = simple_shell
 
 OBJECTS = main.o utils.o history_utils.o
 
-shell: $(OBJECTS)
+all: $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) -o $(TARGET) && rm -f $(OBJECTS)
 
 main.o: main.c utils.h history_utils.h
@@ -29,4 +29,5 @@ clean_o:
 
 clean:
 	rm -f $(TARGET) $(OBJECTS)
+
 

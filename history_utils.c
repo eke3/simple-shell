@@ -15,6 +15,7 @@ int append_history(const char *command) {
         return APPEND_FAILURE;
     }
 
+    // Append command to history file.
     fprintf(history_file, "%s\n", command);
     fclose(history_file);
 
@@ -65,6 +66,7 @@ int print_history() {
 
 
 int clear_history() {
+    // Opening in write mode clears the file.
     FILE* history_file = fopen(HISTORY_FILENAME, "w");
 
     // Check for unsuccessful open.

@@ -18,9 +18,18 @@ description: a simple linux shell designed to perform basic linux commands
 #include "history_utils.h"
 
 #define GETLINE_FAILURE -1
+#define EXECUTE_FAILURE -1
+#define CD_FAILURE -1
+#define CHANGE_PROMPT_FAILURE -1
 #define EXIT_CMD "exit"
 #define PROC_CMD "/proc"
 #define HISTORY_CMD "history"
+#define CD_CMD "cd"
+#define CHANGE_PROMPT_CMD "prompt"
+#define CWD_MAX_LENGTH 1024
+
+// Global Variables.
+char* shell_prompt = "$";
 
 
 /*
@@ -35,7 +44,10 @@ char* get_user_command(void);
 char** parse_command(char*);
 void tear_down(void);
 void handle_sigint(int);
-// execute_command()
+int execute_command(char**);
+int change_directory(char**);
+void print_cwd(void);
+int change_shell_prompt(char**);
 
 
 int main(int argc, char **argv) {
@@ -72,14 +84,27 @@ void tear_down() {
         fprintf(stderr, "Error clearing history file.\n");
         exit(1);
     }
+    free(shell_prompt);
     exit(0);
 }
 
 
 void handle_sigint(int sig) {
-    // Handle Ctrl+C (SIGINT) signal.
-    printf("Interrupt ignored. Type `exit` to quit.\n$ ");
+    // Ignore Ctrl+C interrupt.
+    printf("\nInterrupt ignored. Type `exit` to quit.\n");
+    print_cwd();
     fflush(stdout);
+}
+
+void print_cwd() {
+    char working_directory[CWD_MAX_LENGTH];
+
+    if (getcwd(working_directory, sizeof(working_directory)) == NULL) {
+        perror("getcwd error in user_prompt_loop().\n");
+        printf("%s ", shell_prompt);
+    } else {
+        printf("\033[0;32m%s\033[0m%s ", working_directory, shell_prompt);
+    }
 }
 
 
@@ -87,11 +112,15 @@ void handle_sigint(int sig) {
 void user_prompt_loop() {
     char* cmd = "";
     
+    // Get user input repeatedly until the user enters the "exit" command.
     while (1) {
-        printf("$ ");
+        // Always display the current working directory.
+        print_cwd();
+
         cmd = get_user_command(); // needs free()
         char** parsed_cmd = parse_command(cmd); // needs free()
-
+        int is_shell_cmd = 0;
+        
         if (parsed_cmd != NULL) {        
             // First argument is "exit".
             if (strcmp(parsed_cmd[0], EXIT_CMD) == 0) {
@@ -107,6 +136,7 @@ void user_prompt_loop() {
                     free(parsed_cmd);
                     tear_down();
                 }
+                is_shell_cmd = 1;
             }
 
             // First argument is "/proc".
@@ -117,6 +147,7 @@ void user_prompt_loop() {
                 } else {
                     // Valid /proc command.
                 }
+                is_shell_cmd = 1;
             }
 
             // First argument is "history".
@@ -129,6 +160,30 @@ void user_prompt_loop() {
                     if (print_history() == PRINT_FAILURE) {
                         fprintf(stderr, "Error printing command history.\n");
                     }
+                }
+                is_shell_cmd = 1;
+            }
+
+            // First argument is "cd".
+            if (strcmp(parsed_cmd[0], CD_CMD) == 0) {
+                if (change_directory(parsed_cmd) == CD_FAILURE) {
+                    fprintf(stderr, "Error changing directory.\n");
+                }
+                is_shell_cmd = 1;
+            }
+
+            // First argument is "prompt".
+            if (strcmp(parsed_cmd[0], CHANGE_PROMPT_CMD) == 0) {
+                if (change_shell_prompt(parsed_cmd) == CHANGE_PROMPT_FAILURE) {
+                    fprintf(stderr, "Error changing shell prompt.\n");
+                }
+                is_shell_cmd = 1;
+            }
+
+            // Other commands for program executions.
+            if (!is_shell_cmd) {
+                if (execute_command(parsed_cmd) == EXECUTE_FAILURE) {
+                    fprintf(stderr, "Error executing command.\n");
                 }
             }
 
@@ -325,14 +380,85 @@ Execute the parsed command if the commands are neither /proc nor exit;
 fork a process and execute the parsed command inside the child process
 */
 
-/*execute_command()*/
-// {
+int execute_command(char** parsed_command) {
     /*
     Functions you may need: 
         fork(), execvp(), waitpid(), and any other useful function
     */
 
-    /*
-    ENTER YOUR CODE HERE
-    */
-// }
+    // Create child process.
+    pid_t process_id = fork();
+
+    // Check for error in child process creation.
+    if (process_id < 0) {
+        perror("fork error in execute_command()");
+        return EXECUTE_FAILURE;
+    }
+
+    if (process_id == 0) {
+        // Child process executes the parsed command.
+        if (execvp(parsed_command[0], parsed_command) == -1) {
+            perror("execvp error in execute_command()");
+            exit(1);
+        }
+        exit(0);
+    } else {
+        // Parent process waits for the child process to finish.
+        int status;
+        if (waitpid(process_id, &status, 0) == -1) {
+            perror("waitpid error in execute_command()");
+            return EXECUTE_FAILURE;
+        }
+    }
+
+    return 0;
+}
+
+int change_directory(char** parsed_command) {
+    // Check for too many arguments.
+    if (parsed_command[2] != NULL) {
+        fprintf(stderr, "Usage: cd [directory]\tToo many arguments.\n");
+        return CD_FAILURE;
+    }
+
+    char* destination = getenv("HOME");
+
+    // Set destination based on whether an argument is provided.
+    if (parsed_command[1] == NULL) {
+        destination = getenv("HOME");
+    } else {
+        destination = parsed_command[1];
+    }
+
+    // Change directory to the destination.
+    if (chdir(destination) == -1) {
+        perror("chdir error in change_directory().");
+        return CD_FAILURE;
+    }
+
+    return 0;
+}
+
+
+int change_shell_prompt(char** parsed_command) {
+    // Check for too few arguments.
+    if (parsed_command[1] == NULL) {
+        fprintf(stderr, "Usage: prompt [prompt]\tToo few arguments.\n");
+        return CHANGE_PROMPT_FAILURE;
+    }
+
+    // Check for too many arguments.
+    if (parsed_command[2] != NULL) {
+        fprintf(stderr, "Usage: prompt [prompt]\tToo many arguments.\n");
+        return CHANGE_PROMPT_FAILURE;
+    }
+
+    // Allocate memory for new prompt.
+    shell_prompt = strdup(parsed_command[1]);
+    if (!shell_prompt) {
+        perror("strdup error in change_shell_prompt()");
+        return CHANGE_PROMPT_FAILURE;
+    }
+
+    return 0;
+}
