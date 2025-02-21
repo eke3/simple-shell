@@ -28,8 +28,14 @@ description: a simple linux shell designed to perform basic linux commands
 #define CHANGE_PROMPT_CMD "prompt"
 #define CWD_MAX_LENGTH 1024
 
-// Global Variables.
-char* shell_prompt = "$";
+// Global variables.
+char* shell_prompt;
+char* shell_directory;
+char* history_file_path;
+ssize_t num_bg_processes;
+ssize_t bg_processes_capacity;
+pid_t* bg_processes;
+
 
 
 /*
@@ -48,6 +54,8 @@ int execute_command(char**);
 int change_directory(char**);
 void print_cwd(void);
 int change_shell_prompt(char**);
+void set_up(void);
+int add_bg_process(pid_t);
 
 
 int main(int argc, char **argv) {
@@ -71,10 +79,29 @@ int main(int argc, char **argv) {
         return 1;
     } else {
         // Start program by calling the user_prompt_loop() function.
+        set_up();
         user_prompt_loop();
     }
 
     return 0;
+}
+
+void set_up() {
+    shell_directory = malloc(CWD_MAX_LENGTH);
+    if (getcwd(shell_directory, CWD_MAX_LENGTH) == NULL) {
+        perror("getcwd error in set_up().\n");
+    }
+
+    // Print full history file path to a global variable.
+    history_file_path = malloc(strlen(HISTORY_FILENAME) + strlen("/") + strlen(shell_directory) + 1);
+    snprintf(history_file_path, CWD_MAX_LENGTH, "%s/%s", shell_directory, HISTORY_FILENAME);
+
+    shell_prompt = malloc(strlen("$") + 1);
+    strcpy(shell_prompt, "$");
+
+    bg_processes_capacity = 10;
+    bg_processes = malloc(bg_processes_capacity * sizeof(pid_t));
+    num_bg_processes = 0;
 }
 
 
@@ -84,7 +111,10 @@ void tear_down() {
         fprintf(stderr, "Error clearing history file.\n");
         exit(1);
     }
+    free(history_file_path);
+    free(shell_directory);
     free(shell_prompt);
+    free(bg_processes);
     exit(0);
 }
 
@@ -93,7 +123,6 @@ void handle_sigint(int sig) {
     // Ignore Ctrl+C interrupt.
     printf("\nInterrupt ignored. Type `exit` to quit.\n");
     print_cwd();
-    fflush(stdout);
 }
 
 void print_cwd() {
@@ -103,7 +132,7 @@ void print_cwd() {
         perror("getcwd error in user_prompt_loop().\n");
         printf("%s ", shell_prompt);
     } else {
-        printf("\033[0;32m%s\033[0m%s ", working_directory, shell_prompt);
+        printf("\033[0;34m%s\033[0m%s ", working_directory, shell_prompt);
     }
 }
 
@@ -386,6 +415,18 @@ int execute_command(char** parsed_command) {
         fork(), execvp(), waitpid(), and any other useful function
     */
 
+    // Check if the command should start a background process.
+    int i = 0;
+    int is_background = 0;
+    while (parsed_command[i] != NULL) {
+        i++;
+    }
+    if (strcmp(parsed_command[i-1], "&") == 0) {
+        free(parsed_command[i-1]);
+        parsed_command[i-1] = NULL;
+        is_background = 1;
+    }
+
     // Create child process.
     pid_t process_id = fork();
 
@@ -398,16 +439,24 @@ int execute_command(char** parsed_command) {
     if (process_id == 0) {
         // Child process executes the parsed command.
         if (execvp(parsed_command[0], parsed_command) == -1) {
-            perror("execvp error in execute_command()");
             exit(1);
+        }
+        if (is_background) {
+            // Parent process does not wait for the child process to finish.
+            if (add_bg_process(process_id) == EXECUTE_FAILURE) {
+                return EXECUTE_FAILURE;
+            }
+            printf("Background process %d started.\n", process_id);
         }
         exit(0);
     } else {
-        // Parent process waits for the child process to finish.
-        int status;
-        if (waitpid(process_id, &status, 0) == -1) {
-            perror("waitpid error in execute_command()");
-            return EXECUTE_FAILURE;
+        if (!is_background) {
+            // Parent process waits for the child process to finish.
+            int status;
+            if (waitpid(process_id, &status, 0) == -1) {
+                perror("waitpid error in execute_command()");
+                return EXECUTE_FAILURE;
+            }
         }
     }
 
@@ -454,11 +503,29 @@ int change_shell_prompt(char** parsed_command) {
     }
 
     // Allocate memory for new prompt.
+    free(shell_prompt);
     shell_prompt = strdup(parsed_command[1]);
     if (!shell_prompt) {
         perror("strdup error in change_shell_prompt()");
         return CHANGE_PROMPT_FAILURE;
     }
 
+    return 0;
+}
+
+
+int add_bg_process(pid_t process_id) {
+    if (num_bg_processes >= bg_processes_capacity) {
+        bg_processes_capacity *= 2;
+        pid_t* temp_bg_processes = realloc(bg_processes, bg_processes_capacity * sizeof(pid_t));
+        if (temp_bg_processes == NULL) {
+            perror("realloc error in add_bg_process()");
+            return EXECUTE_FAILURE;
+        }
+        bg_processes = temp_bg_processes;
+    }
+
+    bg_processes[num_bg_processes] = process_id;
+    num_bg_processes++;
     return 0;
 }

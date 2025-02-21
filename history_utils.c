@@ -2,12 +2,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 
+// Global variable for history file path. Ensures that the history is always in the same directory as the shell executable.
+extern char* history_file_path;
 
 int append_history(const char *command) {
-    FILE* history_file = fopen(HISTORY_FILENAME, "a");
+    FILE* history_file = fopen(history_file_path, "a");
 
     // Check for unsuccessful open.
     if (history_file == NULL) {
@@ -24,7 +25,7 @@ int append_history(const char *command) {
 
 
 int print_history() {
-    FILE* history_file = fopen(HISTORY_FILENAME, "r");
+    FILE* history_file = fopen(history_file_path, "r");
 
     // Check for unsuccessful open.
     if (history_file == NULL) {
@@ -37,7 +38,7 @@ int print_history() {
     char* lines[MAX_HISTORY_LINES];
     int line_count = 0;
     size_t length = 0;
-    ssize_t chars_read;
+    size_t chars_read;
 
     while ((chars_read = getline(&line, &length, history_file)) != -1) {
         // Free old lines if we've already read the max number of lines.
@@ -67,7 +68,7 @@ int print_history() {
 
 int clear_history() {
     // Opening in write mode clears the file.
-    FILE* history_file = fopen(HISTORY_FILENAME, "w");
+    FILE* history_file = fopen(history_file_path, "w");
 
     // Check for unsuccessful open.
     if (history_file == NULL) {
