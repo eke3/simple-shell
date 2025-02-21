@@ -16,12 +16,9 @@ description: a simple linux shell designed to perform basic linux commands
 #include <signal.h>
 #include "utils.h"
 #include "history_utils.h"
+#include "shell_commands.h"
 
-#define GETLINE_FAILURE -1
 #define EXECUTE_FAILURE -1
-#define CD_FAILURE -1
-#define CHANGE_PROMPT_FAILURE -1
-#define EXEC_PROC_FAILURE -1
 #define EXIT_CMD "exit"
 #define PROC_CMD "/proc/"
 #define PROC_CMD1 "/proc"
@@ -29,37 +26,29 @@ description: a simple linux shell designed to perform basic linux commands
 #define HISTORY_CMD "history"
 #define CD_CMD "cd"
 #define CHANGE_PROMPT_CMD "prompt"
+#define AMPERSAND "&"
 #define CWD_MAX_LENGTH 1024
 
 // Global variables.
 char* shell_prompt;
 char* shell_directory;
 char* history_file_path;
-ssize_t num_bg_processes;
-ssize_t bg_processes_capacity;
+size_t num_bg_processes;
+size_t bg_processes_capacity;
 pid_t* bg_processes;
 
 
 
-/*
-In this project, you are going to implement a number of functions to 
-create a simple linux shell interface to perform basic linux commands
-*/
-
-
-// DEFINE THE FUNCTION PROTOTYPES
+// Function prototypes.
 void user_prompt_loop(void);
 char* get_user_command(void);
 char** parse_command(char*);
 void tear_down(void);
 void handle_sigint(int);
 int execute_command(char**);
-int change_directory(char**);
 void print_cwd(void);
-int change_shell_prompt(char**);
 void set_up(void);
 int add_bg_process(pid_t);
-int execute_proc_command(char*);
 
 
 int main(int argc, char **argv) {
@@ -110,15 +99,32 @@ void set_up() {
 
 
 void tear_down() {
-    // Clear command history and exit cleanly.
+    // Clear command history.
     if (clear_history() == CLEAR_FAILURE) {
         fprintf(stderr, "Error clearing history file.\n");
         exit(1);
     }
+
+    // Terminate background processes.
+    for (int i = 0; i < num_bg_processes; i++) {
+        if (kill(bg_processes[i], SIGTERM) == -1) {
+            fprintf(stderr, "Failed to terminate a background process.\n");
+            // If terminate fails, kill the process.
+            if (kill(bg_processes[i], SIGKILL) == -1) {
+                fprintf(stderr, "Failed to kill a background process.\n");
+                exit(1);
+            }
+        } else {
+            waitpid(bg_processes[i], NULL, 0);
+        }
+    }
+
     free(history_file_path);
     free(shell_directory);
     free(shell_prompt);
     free(bg_processes);
+
+    printf("Bknd: %ld\n", num_bg_processes);
     exit(0);
 }
 
@@ -126,7 +132,6 @@ void tear_down() {
 void handle_sigint(int sig) {
     // Ignore Ctrl+C interrupt.
     printf("\nInterrupt ignored. Type `exit` to quit.\n");
-    print_cwd();
 }
 
 void print_cwd() {
@@ -147,7 +152,7 @@ void user_prompt_loop() {
     
     // Get user input repeatedly until the user enters the "exit" command.
     while (1) {
-        // Always display the current working directory.
+        // Always display the current working directory with the shell prompt.
         print_cwd();
 
         cmd = get_user_command(); // needs free()
@@ -255,41 +260,8 @@ void user_prompt_loop() {
     }
 }
 
-/*
-user_prompt_loop():
-Get the user input using a loop until the user exits, prompting the user for a command.
-Gets command and sends it to a parser, then compares the first element to the two
-different commands ("/proc", and "exit"). If it's none of the commands, 
-send it to the execute_command() function. If the user decides to exit, then exit 0 or exit 
-with the user given value. 
-*/
-
-/*user_prompt_loop()*/
-// {
-    // initialize variables
-
-    /*
-    loop:
-        1. prompt the user to type command by printing >>
-        2. get the user input using get_user_command() function 
-        3. parse the user input using parse_command() function 
-        Example: 
-            user input: "ls -la"
-            parsed output: ["ls", "-la", NULL]
-
-// }
-
-
-get_user_command():
-Take input of arbitrary size from the user and return to the user_prompt_loop()
-*/
 
 char* get_user_command() {
-    /*
-    Functions you may need: 
-        malloc(), realloc(), getline(), fgetc(), or any other similar functions
-    */
-
     // Initialize variables.
     char* user_command = NULL;
     size_t buffer_size = 0;
@@ -299,7 +271,7 @@ char* get_user_command() {
     command_length = getline(&user_command, &buffer_size, stdin);
 
     // Do nothing if getline fails.
-    if (command_length == GETLINE_FAILURE) {
+    if (command_length == -1) {
         perror("getline error in get_user_command()");
         free(user_command);
         user_command = "";
@@ -313,23 +285,8 @@ char* get_user_command() {
     return user_command;
 }
 
-/*
-parse_command():
-Take command grabbed from the user and parse appropriately.
-Example: 
-    user input: "ls -la"
-    parsed output: ["ls", "-la", NULL]
-Example: 
-    user input: "echo     hello                     world  "
-    parsed output: ["echo", "hello", "world", NULL]
-*/
 
 char** parse_command(char* user_command) {
-    /*
-    Functions you may need: 
-        malloc(), realloc(), free(), strlen(), first_unquoted_space(), unescape()
-    */
-
     // Initialize variables.
     size_t arg_capacity = 10;
     size_t arg_count = 0;
@@ -387,31 +344,20 @@ char** parse_command(char* user_command) {
         free(parsed_command[i]);
         parsed_command[i] = temp_unescaped_arg;
         temp_unescaped_arg = NULL;
-        // printf("parsed_command[%d] = %s\n", i, parsed_command[i]); // FOR TESTING
     }
 
     return parsed_command;
 }
 
-/*
-execute_command():
-Execute the parsed command if the commands are neither /proc nor exit;
-fork a process and execute the parsed command inside the child process
-*/
 
 int execute_command(char** parsed_command) {
-    /*
-    Functions you may need: 
-        fork(), execvp(), waitpid(), and any other useful function
-    */
-
     // Check if the command should start a background process.
     int i = 0;
     int is_background = 0;
     while (parsed_command[i] != NULL) {
         i++;
     }
-    if (strcmp(parsed_command[i-1], "&") == 0) {
+    if (strcmp(parsed_command[i-1], AMPERSAND) == 0) {
         free(parsed_command[i-1]);
         parsed_command[i-1] = NULL;
         is_background = 1;
@@ -432,20 +378,25 @@ int execute_command(char** parsed_command) {
             exit(1);
         }
         if (is_background) {
-            // Parent process does not wait for the child process to finish.
-            if (add_bg_process(process_id) == EXECUTE_FAILURE) {
-                return EXECUTE_FAILURE;
-            }
+            // if (add_bg_process(process_id) == EXECUTE_FAILURE) {
+            //     return EXECUTE_FAILURE;
+            // }
             printf("Background process %d started.\n", process_id);
         }
         exit(0);
     } else {
         if (!is_background) {
-            // Parent process waits for the child process to finish.
-            int status;
-            if (waitpid(process_id, &status, 0) == -1) {
-                perror("waitpid error in execute_command()");
-                return EXECUTE_FAILURE;
+            // Parent process waits for the child process to finish, unless it is backgrounded.
+            if (is_background) {
+                if (add_bg_process(process_id) == EXECUTE_FAILURE) {
+                    return EXECUTE_FAILURE;
+                }
+            } else {
+                int status;
+                if (waitpid(process_id, &status, 0) == -1) {
+                    perror("waitpid error in execute_command()");
+                    return EXECUTE_FAILURE;
+                }
             }
         }
     }
@@ -453,77 +404,6 @@ int execute_command(char** parsed_command) {
     return 0;
 }
 
-
-int execute_proc_command(char* proc_file_path) {
-    // Try to read the contents of the proc file.
-    FILE* proc_file = fopen(proc_file_path, "r");
-    if (proc_file == NULL) {
-        perror("fopen error in execute_proc_command()");
-        return EXEC_PROC_FAILURE;
-    }
-
-    // Read and print the contents of the proc file.
-    char* line = NULL;
-    size_t proc_file_length = 0;
-    while (getline(&line, &proc_file_length, proc_file) != -1) {
-        printf("%s", line);
-    }
-
-    free(line);
-    fclose(proc_file);
-
-    return 0;
-}
-
-int change_directory(char** parsed_command) {
-    // Check for too many arguments.
-    if (parsed_command[2] != NULL) {
-        fprintf(stderr, "Usage: cd [directory]\tToo many arguments.\n");
-        return CD_FAILURE;
-    }
-
-    char* destination = getenv("HOME");
-
-    // Set destination based on whether an argument is provided.
-    if (parsed_command[1] == NULL) {
-        destination = getenv("HOME");
-    } else {
-        destination = parsed_command[1];
-    }
-
-    // Change directory to the destination.
-    if (chdir(destination) == -1) {
-        perror("chdir error in change_directory().");
-        return CD_FAILURE;
-    }
-
-    return 0;
-}
-
-
-int change_shell_prompt(char** parsed_command) {
-    // Check for too few arguments.
-    if (parsed_command[1] == NULL) {
-        fprintf(stderr, "Usage: prompt [prompt]\tToo few arguments.\n");
-        return CHANGE_PROMPT_FAILURE;
-    }
-
-    // Check for too many arguments.
-    if (parsed_command[2] != NULL) {
-        fprintf(stderr, "Usage: prompt [prompt]\tToo many arguments.\n");
-        return CHANGE_PROMPT_FAILURE;
-    }
-
-    // Allocate memory for new prompt.
-    free(shell_prompt);
-    shell_prompt = strdup(parsed_command[1]);
-    if (!shell_prompt) {
-        perror("strdup error in change_shell_prompt()");
-        return CHANGE_PROMPT_FAILURE;
-    }
-
-    return 0;
-}
 
 
 int add_bg_process(pid_t process_id) {
