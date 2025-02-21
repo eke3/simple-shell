@@ -21,8 +21,11 @@ description: a simple linux shell designed to perform basic linux commands
 #define EXECUTE_FAILURE -1
 #define CD_FAILURE -1
 #define CHANGE_PROMPT_FAILURE -1
+#define EXEC_PROC_FAILURE -1
 #define EXIT_CMD "exit"
-#define PROC_CMD "/proc"
+#define PROC_CMD "/proc/"
+#define PROC_CMD1 "/proc"
+#define FWD_SLASH "/"
 #define HISTORY_CMD "history"
 #define CD_CMD "cd"
 #define CHANGE_PROMPT_CMD "prompt"
@@ -56,6 +59,7 @@ void print_cwd(void);
 int change_shell_prompt(char**);
 void set_up(void);
 int add_bg_process(pid_t);
+int execute_proc_command(char*);
 
 
 int main(int argc, char **argv) {
@@ -168,13 +172,34 @@ void user_prompt_loop() {
                 is_shell_cmd = 1;
             }
 
-            // First argument is "/proc".
-            if (strcmp(parsed_cmd[0], PROC_CMD) == 0) {
-                if (parsed_cmd[1] == NULL) {
+            // First argument starts with "/proc/".
+            if (strncmp(parsed_cmd[0], PROC_CMD, strlen(PROC_CMD)) == 0) {
+                // Case when command is passed as a single argument.
+                if (parsed_cmd[1] != NULL) {
                     // Invalid /proc command.
-                    fprintf(stderr, "Usage: /proc /[filepath]\tNot enough arguments.\n");
+                    fprintf(stderr, "Usage: /proc/[filepath]\tAdditional arguments are not supported.\n");
                 } else {
                     // Valid /proc command.
+                    if (execute_proc_command(parsed_cmd[0]) == EXEC_PROC_FAILURE) {
+                        fprintf(stderr, "Error executing /proc command.\n");
+                    }
+                }
+                is_shell_cmd = 1;
+            } else if ((strcmp(parsed_cmd[0], PROC_CMD1) == 0) && (parsed_cmd[1] != NULL)) {
+                // Case when command is passed as 2 arguments (e.g., "/proc /filepath").
+                if (strncmp(parsed_cmd[1], FWD_SLASH, strlen(FWD_SLASH)) == 0) {
+                    if (parsed_cmd[2] == NULL) {
+                        // Valid /proc command that needs to be concatenated.
+                        char* proc_cmd_concat = malloc((strlen(parsed_cmd[0]) + strlen(parsed_cmd[1]) + 1) * sizeof(char));
+                        strcpy(proc_cmd_concat, parsed_cmd[0]);
+                        strcat(proc_cmd_concat, parsed_cmd[1]);
+                        if (execute_proc_command(proc_cmd_concat) == EXEC_PROC_FAILURE) {
+                            fprintf(stderr, "Error executing /proc command.\n");
+                        }
+                        free(proc_cmd_concat);
+                    } else {
+                        fprintf(stderr, "Usage: /proc/[filepath]\tAdditional arguments are not supported.\n");
+                    }
                 }
                 is_shell_cmd = 1;
             }
@@ -215,41 +240,6 @@ void user_prompt_loop() {
                     fprintf(stderr, "Error executing command.\n");
                 }
             }
-
-
-
-                // 5. if the first element is "/proc" then you have the open the /proc file system 
-                //    to read from it
-                //     i) concat the full command:
-                //         Ex: user input >>/proc /process_id_no/status
-                //             concated output: /proc/process_id_no/status
-                //     ii) read from the file line by line. you may user fopen() and getline() functions
-                //     iii) display the following information according to the user input from /proc
-                //         a) Get the cpu information if the input is /proc/cpuinfo
-                //         - Cpu Mhz
-                //         - Cache size
-                //         - Cpu cores
-                //         - Address sizes
-                //         b) Get the number of currently running processes from /proc/loadavg
-                //         c) Get how many seconds your box has been up, and how many seconds it has been idle from /proc/uptime
-                //         d) Get the following information from /proc/process_id_no/status
-                //         - the vm size of the virtual memory allocated the vbox 
-                //         - the most memory used vmpeak 
-                //         - the process state
-                //         - the parent pid
-                //         - the number of threads
-                //         - number of voluntary context switches
-                //         - number of involuntary context switches
-                //         e) display the list of environment variables from /proc/process_id_no/environ
-                //         f) display the performance information if the user input is /proc/process_id_no/sched
-                // 7. otherwise pass the parsed command to execute_command() function 
-        
-            /*
-            Functions you may need: 
-                get_user_command(), parse_command(), execute_command(), strcmp(), strcat(), 
-                strlen(), strncmp(), fopen(), fclose(), getline(), isdigit(), atoi(), fgetc(), 
-                or any other useful functions
-            */
             
             // Append latest command to history file.
             if (append_history(cmd) == APPEND_FAILURE) {
@@ -459,6 +449,28 @@ int execute_command(char** parsed_command) {
             }
         }
     }
+
+    return 0;
+}
+
+
+int execute_proc_command(char* proc_file_path) {
+    // Try to read the contents of the proc file.
+    FILE* proc_file = fopen(proc_file_path, "r");
+    if (proc_file == NULL) {
+        perror("fopen error in execute_proc_command()");
+        return EXEC_PROC_FAILURE;
+    }
+
+    // Read and print the contents of the proc file.
+    char* line = NULL;
+    size_t proc_file_length = 0;
+    while (getline(&line, &proc_file_length, proc_file) != -1) {
+        printf("%s", line);
+    }
+
+    free(line);
+    fclose(proc_file);
 
     return 0;
 }
