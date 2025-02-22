@@ -59,7 +59,7 @@ int change_shell_prompt(char** parsed_command) {
 
 
 int execute_proc_command(char* proc_file_path) {
-    // Try to read the contents of the proc file.
+    // Try to open the proc file.
     FILE* proc_file = fopen(proc_file_path, "r");
     if (proc_file == NULL) {
         perror("fopen error in execute_proc_command()");
@@ -75,15 +75,13 @@ int execute_proc_command(char* proc_file_path) {
 
     free(line);
     fclose(proc_file);
-
     return 0;
 }
 
 
 int print_history() {
+    // Try to open the history file.
     FILE* history_file = fopen(history_file_path, "r");
-
-    // Check for unsuccessful open.
     if (history_file == NULL) {
         perror("error opening .421sh history file");
         return PRINT_FAILURE;
@@ -93,9 +91,8 @@ int print_history() {
     char* lines[MAX_HISTORY_LINES];
     size_t line_count = 0;
     size_t length = 0;
-    size_t chars_read;
 
-    while ((chars_read = getline(&line, &length, history_file)) != -1) {
+    while (getline(&line, &length, history_file) != -1) {
         // Free old lines if we've already read the max number of lines.
         if (line_count == MAX_HISTORY_LINES) {
             free(lines[line_count % MAX_HISTORY_LINES]);

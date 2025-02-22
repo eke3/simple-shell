@@ -33,33 +33,19 @@ description: a simple linux shell designed to perform basic linux commands
 char* shell_prompt;
 char* shell_directory;
 char* history_file_path;
-size_t num_bg_processes;
-size_t bg_processes_capacity;
-pid_t* bg_processes;
-
-
 
 // Function prototypes.
 void user_prompt_loop(void);
 char* get_user_command(void);
 char** parse_command(char*);
 void tear_down(void);
-void handle_sigint(int);
 int execute_command(char**);
-void print_cwd(void);
 void set_up(void);
-int add_bg_process(pid_t);
+void print_cwd(void);
+void handle_sigint(int);
 
 
 int main(int argc, char **argv) {
-    /*
-    Write the main function that checks the number of argument passed to ensure 
-    no command-line arguments are passed; if the number of argument is greater 
-    than 1 then exit the shell with a message to stderr and return value of 1
-    otherwise call the user_prompt_loop() function to get user input repeatedly 
-    until the user enters the "exit" command.
-    */
-
     // Set Ctrl+C (SIGINT) signal interrupt handler.
     if (signal(SIGINT, handle_sigint) == SIG_ERR) {
         fprintf(stderr, "Error setting Ctrl+C signal handler\n");
@@ -91,10 +77,6 @@ void set_up() {
 
     shell_prompt = malloc(strlen("$") + 1);
     strcpy(shell_prompt, "$");
-
-    bg_processes_capacity = 10;
-    bg_processes = malloc(bg_processes_capacity * sizeof(pid_t));
-    num_bg_processes = 0;
 }
 
 
@@ -105,46 +87,11 @@ void tear_down() {
         exit(1);
     }
 
-    // Terminate background processes.
-    for (int i = 0; i < num_bg_processes; i++) {
-        if (kill(bg_processes[i], SIGTERM) == -1) {
-            fprintf(stderr, "Failed to terminate a background process.\n");
-            // If terminate fails, kill the process.
-            if (kill(bg_processes[i], SIGKILL) == -1) {
-                fprintf(stderr, "Failed to kill a background process.\n");
-                exit(1);
-            }
-        } else {
-            waitpid(bg_processes[i], NULL, 0);
-        }
-    }
-
     free(history_file_path);
     free(shell_directory);
     free(shell_prompt);
-    free(bg_processes);
-
-    printf("Bknd: %ld\n", num_bg_processes);
     exit(0);
 }
-
-
-void handle_sigint(int sig) {
-    // Ignore Ctrl+C interrupt.
-    printf("\nInterrupt ignored. Type `exit` to quit.\n");
-}
-
-void print_cwd() {
-    char working_directory[CWD_MAX_LENGTH];
-
-    if (getcwd(working_directory, sizeof(working_directory)) == NULL) {
-        perror("getcwd error in user_prompt_loop().\n");
-        printf("%s ", shell_prompt);
-    } else {
-        printf("\033[0;34m%s\033[0m%s ", working_directory, shell_prompt);
-    }
-}
-
 
 
 void user_prompt_loop() {
@@ -352,8 +299,9 @@ char** parse_command(char* user_command) {
 
 int execute_command(char** parsed_command) {
     // Check if the command should start a background process.
-    int i = 0;
     int is_background = 0;
+
+    int i = 0;
     while (parsed_command[i] != NULL) {
         i++;
     }
@@ -373,30 +321,20 @@ int execute_command(char** parsed_command) {
     }
 
     if (process_id == 0) {
-        // Child process executes the parsed command.
+        // Child process.
+        // Child executes the parsed command.
         if (execvp(parsed_command[0], parsed_command) == -1) {
             exit(1);
         }
-        if (is_background) {
-            // if (add_bg_process(process_id) == EXECUTE_FAILURE) {
-            //     return EXECUTE_FAILURE;
-            // }
-            printf("Background process %d started.\n", process_id);
-        }
         exit(0);
     } else {
+        // Parent process.
         if (!is_background) {
-            // Parent process waits for the child process to finish, unless it is backgrounded.
-            if (is_background) {
-                if (add_bg_process(process_id) == EXECUTE_FAILURE) {
-                    return EXECUTE_FAILURE;
-                }
-            } else {
-                int status;
-                if (waitpid(process_id, &status, 0) == -1) {
-                    perror("waitpid error in execute_command()");
-                    return EXECUTE_FAILURE;
-                }
+            // Wait for child process to terminate if it is not a background process.
+            int status;
+            if (waitpid(process_id, &status, 0) == -1) {
+                perror("waitpid error in execute_command()");
+                return EXECUTE_FAILURE;
             }
         }
     }
@@ -405,19 +343,19 @@ int execute_command(char** parsed_command) {
 }
 
 
+void handle_sigint(int sig) {
+    // Ignore Ctrl+C interrupt.
+    printf("\nInterrupt ignored. Type `exit` to quit.\n");
+}
 
-int add_bg_process(pid_t process_id) {
-    if (num_bg_processes >= bg_processes_capacity) {
-        bg_processes_capacity *= 2;
-        pid_t* temp_bg_processes = realloc(bg_processes, bg_processes_capacity * sizeof(pid_t));
-        if (temp_bg_processes == NULL) {
-            perror("realloc error in add_bg_process()");
-            return EXECUTE_FAILURE;
-        }
-        bg_processes = temp_bg_processes;
+
+void print_cwd() {
+    char working_directory[CWD_MAX_LENGTH];
+
+    if (getcwd(working_directory, sizeof(working_directory)) == NULL) {
+        perror("getcwd error in user_prompt_loop().\n");
+        printf("%s ", shell_prompt);
+    } else {
+        printf("\033[0;34m%s\033[0m%s ", working_directory, shell_prompt);
     }
-
-    bg_processes[num_bg_processes] = process_id;
-    num_bg_processes++;
-    return 0;
 }
