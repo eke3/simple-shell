@@ -10,28 +10,26 @@
 #include <string.h>
 
 int append_history(const char* command) {
-    FILE* history_file = fopen(history_file_path, "a");
+    FILE* history_file;
 
-    // Check for unsuccessful open.
-    if (history_file == NULL) {
+    // Open history file in append mode.
+    if ((history_file = fopen(history_file_path, "a")) == NULL) {
         perror("error opening .421sh history file");
         return APPEND_FAILURE;
-    }
+    };
 
     // Append command to history file.
     fprintf(history_file, "%s\n", command);
     fclose(history_file);
-
     return 0;
 }
 
 
 int clear_history() {
-    // Opening in write mode clears the file.
-    FILE* history_file = fopen(history_file_path, "w");
-
-    // Check for unsuccessful open.
-    if (history_file == NULL) {
+    FILE* history_file;
+    
+    // Opening in write mode clears the file. Check for unsuccessful open.
+    if ((history_file = fopen(history_file_path, "w")) == NULL) {
         perror("error opening .421sh history file");
         return CLEAR_FAILURE;
     }
