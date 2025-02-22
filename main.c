@@ -1,48 +1,98 @@
-/*
-project: 01
-author: 
-email: 
-student id: 
-due date: 2/28/21 11:59:59 pm
-description: a simple linux shell designed to perform basic linux commands
-*/
+// File:    main.c
+// Author:  Eric Ekey
+// Date:    2/22/2025
+// Desc:    This file contains the main function of a simple linux shell
+//          designed to perform basic linux commands.
 
+#include "history_utils.h"
+#include "shell_commands.h"
+#include "utils.h"
+
+#include <ctype.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/wait.h>
-#include <ctype.h>
-#include <signal.h>
-#include "utils.h"
-#include "history_utils.h"
-#include "shell_commands.h"
+#include <unistd.h>
 
-#define EXECUTE_FAILURE -1
-#define EXIT_CMD "exit"
-#define PROC_CMD "/proc/"
-#define PROC_CMD1 "/proc"
-#define FWD_SLASH "/"
-#define HISTORY_CMD "history"
+#define AMPERSAND "&"
 #define CD_CMD "cd"
 #define CHANGE_PROMPT_CMD "prompt"
-#define AMPERSAND "&"
 #define CWD_MAX_LENGTH 1024
+#define EXECUTE_FAILURE -1
+#define EXIT_CMD "exit"
+#define FWD_SLASH "/"
+#define HISTORY_CMD "history"
+#define PROC_CMD "/proc/"
+#define PROC_CMD1 "/proc"
 
 // Global variables.
-char* shell_prompt;
+char* history_file_path; 
 char* shell_directory;
-char* history_file_path;
+char* shell_prompt;
+
+#pragma region Prototypes
 
 // Function prototypes.
-void user_prompt_loop(void);
-char* get_user_command(void);
-char** parse_command(char*);
-void tear_down(void);
+
+// int execute_command(char**)
+// Description: Executes the provided command.
+// Preconditions: A non-null command is provided as an argument.
+// Postconditions: The command is executed.
+// Return: 0 on success, -1 on failure.
 int execute_command(char**);
-void set_up(void);
-void print_cwd(void);
+
+// char* get_user_command()
+// Description: Gets user input from stdin.
+// Preconditions: None.
+// Postconditions: None.
+// Return: A string containing the user input.
+char* get_user_command(void);
+
+// char** parse_command(char*)
+// Description: Parses the user input into an array of command arguments.
+// Preconditions: A non-null command is provided as an argument.
+// Postconditions: None.
+// Return: An array of command arguments.
+char** parse_command(char*);
+
+// void handle_sigint(int)
+// Description: Handles the Ctrl+C signal interrupt.
+// Preconditions: Ctrl+C is pressed.
+// Postconditions: The interrupt is ignored and a message is printed to stdout.
+// Return: None.
 void handle_sigint(int);
+
+// void print_cwd()
+// Description: Prints the current working directory and shell prompt.
+// Preconditions: shell_prompt is set.
+// Postconditions: The current working directory and shell prompt are printed to stdout.
+// Return: None.
+void print_cwd(void);
+
+// void set_up()
+// Description: Sets up the shell environment.
+// Preconditions: None.
+// Postconditions: Memory is allocated for global variables and global variables are set.
+// Return: None.
+void set_up(void);
+
+// void tear_down()
+// Description: Tears down the shell environment.
+// Preconditions: None.
+// Postconditions: Memory is freed for global variables and command history is cleared. Exits process.
+// Return: None.
+void tear_down(void);
+
+// void user_prompt_loop()
+// Description: Gets user input repeatedly until the user enters the "exit" command. Manages command execution based on user input.
+// Preconditions: Shell environment is set up.
+// Postconditions: Commands are executed and appended to history according to user input.
+// Return: None.
+void user_prompt_loop(void);
+
+#pragma endregion Prototypes
 
 
 int main(int argc, char **argv) {
@@ -64,6 +114,9 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+
+#pragma region Implementations
 
 void set_up() {
     shell_directory = malloc(CWD_MAX_LENGTH);
@@ -96,14 +149,13 @@ void tear_down() {
 
 void user_prompt_loop() {
     char* cmd = "";
-    
     // Get user input repeatedly until the user enters the "exit" command.
     while (1) {
         // Always display the current working directory with the shell prompt.
         print_cwd();
 
-        cmd = get_user_command(); // needs free()
-        char** parsed_cmd = parse_command(cmd); // needs free()
+        cmd = get_user_command();
+        char** parsed_cmd = parse_command(cmd);
         int is_shell_cmd = 0;
         
         if (parsed_cmd != NULL) {        
@@ -359,3 +411,5 @@ void print_cwd() {
         printf("\033[0;34m%s\033[0m%s ", working_directory, shell_prompt);
     }
 }
+
+#pragma endregion Implementations

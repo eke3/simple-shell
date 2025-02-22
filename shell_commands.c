@@ -1,3 +1,8 @@
+// File:    shell_commands.c
+// Author:  Eric Ekey
+// Date:    2/22/2025
+// Desc:    This file contains functions for executing built-in shell commands.
+
 #include "shell_commands.h"
 
 #include <stdio.h>
@@ -20,7 +25,7 @@ int change_directory(char** parsed_command) {
     } else if (num_args == 2) {
         destination = parsed_command[1];
     } else if (num_args == 1) {
-        destination = getenv("HOME");
+        destination = getenv(HOME_ENV);
     }
 
     // Change directory to the destination.

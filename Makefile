@@ -25,6 +25,9 @@ run:
 	./$(TARGET)
 
 val:
+	valgrind ./$(TARGET)
+
+val_full:
 	valgrind --leak-check=full --show-leak-kinds=all -s ./$(TARGET)
 
 clean_o:
