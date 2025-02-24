@@ -18,7 +18,8 @@ extern "C" {
 // int change_directory(char**)
 // Description: Changes the current working directory.
 // Preconditions: A non-null command is provided as an argument.
-// Postconditions: The current working directory is changed according to the command.
+// Postconditions: The current working directory is changed according to the
+// command.
 // Return: 0 on success, -1 on failure.
 extern int change_directory(char**);
 
@@ -32,7 +33,8 @@ extern int change_shell_prompt(char**);
 // int execute_proc_command(char*)
 // Description: Executes a proc command.
 // Preconditions: A non-null command is provided as an argument.
-// Postconditions: The proc command is executed by displaying the contents of the proc file.
+// Postconditions: The proc command is executed by displaying the contents of
+// the proc file.
 // Return: 0 on success, -1 on failure.
 extern int execute_proc_command(char*);
 

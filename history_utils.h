@@ -13,8 +13,10 @@ extern "C" {
 
 // int append_history(const char*)
 // Description: Appends the provided command to the history file.
-// Preconditions: history_file_path is set. A non-null command is provided as an argument.
-// Postconditions: The command is appended to the history file. History file is created if it does not exist.
+// Preconditions: history_file_path is set. A non-null command is provided as an
+// argument.
+// Postconditions: The command is appended to the history file. History file is 
+// created if it does not exist.
 // Return: 0 on success, -1 on failure.
 extern int append_history(const char*);
 
