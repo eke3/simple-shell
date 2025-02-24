@@ -19,7 +19,6 @@
 #define AMPERSAND "&"
 #define CD_CMD "cd"
 #define CHANGE_PROMPT_CMD "prompt"
-#define CWD_MAX_LENGTH 1024
 #define EXECUTE_FAILURE -1
 #define EXIT_CMD "exit"
 #define FWD_SLASH "/"
@@ -427,15 +426,16 @@ void handle_sigint(int sig) {
 
 
 void print_cwd() {
-    char working_directory[CWD_MAX_LENGTH];
+    char* working_directory;
 
-    if (getcwd(working_directory, sizeof(working_directory)) == NULL) {
+    if ((working_directory = getcwd(NULL, 0)) == NULL) {
         // Print the shell prompt by itself if the current working directory cannot be obtained.
         perror("getcwd error in user_prompt_loop()");
         printf("%s ", shell_prompt);
     } else {
         // Print the current working directory in blue with the shell prompt.
         printf("\033[0;34m%s\033[0m%s ", working_directory, shell_prompt);
+        free(working_directory);
     }
 }
 
