@@ -6,14 +6,13 @@ TARGET = simple_shell
 
 OBJECTS = main.o utils.o history_utils.o shell_commands.o
 
-LS_TEST_SCRIPT = run_ls.sh
+TESTING_TEXT_FILE = text.txt
 HISTORY_FILE = .421sh
 
 all: $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) -o $(TARGET)
-	echo 'ls --color=auto' > ${LS_TEST_SCRIPT}
-	echo 'whoami' >> run_ls.sh
-	chmod +x ${LS_TEST_SCRIPT}
+	echo 'These are the contents of $(TESTING_TEXT_FILE)' > ${TESTING_TEXT_FILE}
+	echo 'End of file' >> ${TESTING_TEXT_FILE}
 	rm -f $(OBJECTS)
 
 main.o: main.c utils.h history_utils.h shell_commands.h
@@ -38,6 +37,6 @@ test:
 	valgrind --leak-check=full --show-leak-kinds=all -s ./$(TARGET)
 
 clean:
-	rm -f $(TARGET) $(OBJECTS) ${LS_TEST_SCRIPT} ${HISTORY_FILE}
+	rm -f $(TARGET) $(OBJECTS) ${TESTING_TEXT_FILE} ${HISTORY_FILE}
 
 

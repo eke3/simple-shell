@@ -106,6 +106,7 @@ int main(int argc, char** argv) {
             argv[0]);
     return 1;
   } else {
+    // NOTE: Extra credit - detailed error messaging/handling throughout program.
     // Start program by calling the user_prompt_loop() function.
     set_up();
     user_prompt_loop();
@@ -121,6 +122,7 @@ int main(int argc, char** argv) {
 #pragma region Implementations
 
 void set_up() {
+  // NOTE: Extra credit - implementing Ctrl+C signal interrupt.
   // Set Ctrl+C (SIGINT) signal interrupt handler.
   if (signal(SIGINT, handle_sigint) == SIG_ERR) {
     fprintf(stderr, "Error setting Ctrl+C signal handler\n");
@@ -255,6 +257,7 @@ void user_prompt_loop() {
         is_shell_cmd = 1;
       }
 
+      // NOTE: Extra credit - changes working directory.
       // First argument is "cd".
       if (strcmp(parsed_cmd[0], CD_CMD) == 0) {
         if (change_directory(parsed_cmd) == CD_FAILURE) {
@@ -263,6 +266,7 @@ void user_prompt_loop() {
         is_shell_cmd = 1;
       }
 
+      // NOTE: Extra credit - changes shell prompt.
       // First argument is "prompt".
       if (strcmp(parsed_cmd[0], CHANGE_PROMPT_CMD) == 0) {
         if (change_shell_prompt(parsed_cmd) == CHANGE_PROMPT_FAILURE) {
@@ -388,6 +392,7 @@ char** parse_command(char* user_command) {
 }
 
 int execute_command(char** parsed_command) {
+  // NOTE: Extra credit - implementing background process execution.
   // Check if the command should start a background process.
   int is_background = 0;
   int i = 0;
