@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -std=c99 -D_POSIX_C_SOURCE=200809L
 
 # Target executable
 TARGET = simple_shell
