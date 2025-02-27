@@ -327,16 +327,23 @@ char** parse_command(char* user_command) {
   size_t arg_count = 0;
   size_t command_length = strlen(user_command);
   int start_pos = 0;
+  int end_pos = command_length - 1;
   char** parsed_command = malloc(arg_capacity * sizeof(char*));
 
   // Skip leading whitespaces.
   while ((start_pos < command_length) &&
-         isspace((unsigned char)user_command[start_pos])) {
+         isspace(user_command[start_pos])) {
     start_pos++;
   }
 
+  // Eliminate trailing whitespaces.
+  while ((end_pos >= 0) && isspace(user_command[end_pos])) {
+    user_command[end_pos] = '\0';
+    end_pos--;
+  }
+
   // If the command is empty, return NULL.
-  if ((!command_length) || (start_pos == command_length)) {
+  if ((!command_length) || (start_pos >= end_pos)) {
     free(parsed_command);
     return NULL;
   }
