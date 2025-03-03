@@ -31,7 +31,7 @@ This project is a simple custom shell designed to provide basic command-line fun
 ## Installation and Setup
 ### Setup
 
-Install up-to-date dependencies for building this program:
+Install up-to-date dependencies for building this program and going through the demo:
 
 **Debian**
 ```bash
@@ -62,7 +62,7 @@ This demonstration shows that the shell will not start with extra command line a
 ```bash
 eric@fedora:~/Documents/2024-25 Spring/cmsc421/Projects/proj01$ make
 gcc -Wall -c main.c
-gcc -Wall -c utils.c                        ^
+gcc -Wall -c utils.c                       
 gcc -Wall -c history_utils.c
 gcc -Wall -c shell_commands.c
 gcc -Wall main.o utils.o history_utils.o shell_commands.o -o simple_shell
@@ -139,7 +139,7 @@ Interrupt ignored. Type `exit` to quit.
 
 ## Troubleshooting
 ### Known Issues
-* When a child process attempts to execute a command and fails, no error message will be displayed. I chose to omit the error message because it was appearing after the next shell prompt, instead of before. I could not figure out how to get the parent process to react to a child process exiting with a failure code. This can be observed when trying to run `/proc` with no additional valid arguments or trying to execute a program that does not exist (e.g., `misspelledcommand`).
+* When a child process attempts to execute a command and fails, no error message will be displayed. I chose to omit the error message because it was appearing after the next shell prompt, instead of before. This can be observed when trying to run `/proc` with no additional valid arguments or trying to execute a program that does not exist (e.g., `misspelledcommand`).
 
 * When a command is entered by the user that is not recognized by the shell, no error message is produced. For the same reason as the above issue.
 

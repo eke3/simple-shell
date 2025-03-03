@@ -1,7 +1,8 @@
 CC = gcc
-CFLAGS = -g -Wall -O0 -std=c99 -D_POSIX_C_SOURCE=200809L
+CFLAGS = -g -Wall -O0 -std=c99 -D_POSIX_C_SOURCE=200809L -Wno-unknown-pragmas -Wno-unused-variable
 LDFLAGS = -lm
-VALGRIND_FLAGS = --leak-check=full --show-leak-kinds=all --track-origins=yes -s
+VALGRIND_FLAGS = --leak-check=full
+EXTRA_VALGRIND_FLAGS = --show-leak-kinds=all --track-origins=yes -s
 
 TARGET = simple_shell
 SOURCES = main.c utils.c history_utils.c shell_commands.c bg_utils.c
@@ -39,6 +40,9 @@ run:
 
 val:
 	valgrind $(VALGRIND_FLAGS) ./$(TARGET)
+
+val_extra:
+	valgrind ${VALGRIND_FLAGS} $(EXTRA_VALGRIND_FLAGS) ./$(TARGET)
 
 clean:
 	rm -f $(TARGET) $(OBJECTS) ${TESTING_TEXT_FILE} ${HISTORY_FILE} core
