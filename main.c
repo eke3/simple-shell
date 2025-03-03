@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "bg_utils.h"
 #include "history_utils.h"
 #include "shell_commands.h"
 #include "utils.h"
@@ -19,21 +20,23 @@
 #define AMPERSAND "&"
 #define CD_CMD "cd"
 #define CHANGE_PROMPT_CMD "prompt"
+#define DOLLAR_SIGN "$"
 #define EXECUTE_FAILURE -1
 #define EXIT_CMD "exit"
+#define FG_CMD "fg"
 #define FWD_SLASH "/"
 #define HISTORY_CMD "history"
+#define JOBS_CMD "jobs"
 #define PROC_CMD "/proc/"
 #define PROC_CMD1 "/proc"
 
 // Global variables.
+struct bg_processes_t* bg_processes;
 char* history_file_path;
 char* shell_directory;
 char* shell_prompt;
 
 #pragma region Prototypes
-
-// Function prototypes.
 
 // int execute_command(char**)
 // Description: Executes the provided command.
@@ -91,8 +94,8 @@ void tear_down(void);
 // Description: Gets user input repeatedly until the user enters the "exit"
 // command. Manages command execution based on user input.
 // Preconditions: Shell environment is set up.
-// Postconditions: Commands are executed and appended to history according to 
-//user input.
+// Postconditions: Commands are executed and appended to history according to
+// user input.
 // Return: None.
 void user_prompt_loop(void);
 
@@ -106,8 +109,8 @@ int main(int argc, char** argv) {
             argv[0]);
     return 1;
   } else {
-    // NOTE: Extra credit - detailed error messaging/handling throughout program.
-    // Start program by calling the user_prompt_loop() function.
+    // NOTE: Extra credit - detailed error messaging/handling throughout
+    // program. Start program by calling the user_prompt_loop() function.
     set_up();
     user_prompt_loop();
 
@@ -148,11 +151,21 @@ void set_up() {
   }
 
   // Print shell prompt to a global variable.
-  if ((shell_prompt = malloc(strlen("$") + 1)) == NULL) {
+  if ((shell_prompt = malloc(strlen(DOLLAR_SIGN) + 1)) == NULL) {
     perror("shell_prompt malloc error in set_up()");
     exit(EXIT_FAILURE);
   }
-  strcpy(shell_prompt, "$");
+  strcpy(shell_prompt, DOLLAR_SIGN);
+
+  // Initialize global struct for tracking background processes.
+  if ((bg_processes = malloc(sizeof(struct bg_processes_t))) == NULL) {
+    perror("bg_processes malloc error in set_up()");
+    exit(EXIT_FAILURE);
+  }
+  if (set_up_bg_processes() == SETUP_FAILURE) {
+    fprintf(stderr, "Failed to set up background process tracking.\n");
+    exit(EXIT_FAILURE);
+  }
 }
 
 void tear_down() {
@@ -162,7 +175,14 @@ void tear_down() {
     exit(EXIT_FAILURE);
   }
 
+  // Free memory allocated for background process tracking.
+  if (clear_bg_processes() == CLEAR_BG_FAILURE) {
+    fprintf(stderr, "Error clearing background process data.\n");
+    exit(EXIT_FAILURE);
+  }
+
   // Free memory allocated for global variables.
+  free(bg_processes);
   free(history_file_path);
   free(shell_directory);
   free(shell_prompt);
@@ -170,7 +190,7 @@ void tear_down() {
 }
 
 void user_prompt_loop() {
-  char* cmd = "";
+  char* cmd = NULL;
   // Get user input repeatedly until the user enters the "exit" command.
   while (1) {
     // Always display the current working directory with the shell prompt.
@@ -275,6 +295,46 @@ void user_prompt_loop() {
         is_shell_cmd = 1;
       }
 
+      // NOTE: Extra credit - lists background processes.
+      // First argument is "jobs".
+      if (strcmp(parsed_cmd[0], JOBS_CMD) == 0) {
+        if (parsed_cmd[1] != NULL) {
+          // Invalid background command.
+          fprintf(stderr,
+                  "Usage: bg\tAdditional arguments are not supported\n");
+        } else {
+          // Valid background command.
+          if (remove_dead_processes() == CLEAR_BG_FAILURE) {
+            fprintf(stderr, "Error removing dead background processes.\n");
+          }
+          if (list_bg_processes() == BG_FAILURE) {
+            fprintf(stderr, "Error listing background processes.\n");
+          }
+        }
+        is_shell_cmd = 1;
+      }
+
+      // NOTE: Extra credit - foregrounds a background process.
+      // First argument is "fg".
+      if (strcmp(parsed_cmd[0], FG_CMD) == 0) {
+        if (parsed_cmd[1] == NULL) {
+          // Invalid foreground command.
+          fprintf(stderr, "Usage: fg [pid]\tToo few arguments.\n");
+        } else {
+          if (parsed_cmd[2] != NULL) {
+            // Invalid foreground command.
+            fprintf(stderr, "Usage: fg [pid]\tToo many arguments.\n");
+          } else {
+            // Valid foreground command.
+            if (foreground_process(atoi(parsed_cmd[1])) == FG_FAILURE) {
+              fprintf(stderr, "Error foregrounding process.\n");
+            }
+          }
+
+        }
+        is_shell_cmd = 1;
+      }
+
       // Other commands for program executions.
       if (!is_shell_cmd) {
         if (execute_command(parsed_cmd) == EXECUTE_FAILURE) {
@@ -331,8 +391,7 @@ char** parse_command(char* user_command) {
   char** parsed_command = malloc(arg_capacity * sizeof(char*));
 
   // Skip leading whitespaces.
-  while ((start_pos < command_length) &&
-         isspace(user_command[start_pos])) {
+  while ((start_pos < command_length) && isspace(user_command[start_pos])) {
     start_pos++;
   }
 
@@ -366,9 +425,10 @@ char** parse_command(char* user_command) {
       parsed_command = temp_parsed_cmd;
     }
 
-    int relative_space_pos = first_unquoted_space(user_command + start_pos);
-    int space_pos =
-        (relative_space_pos == -1) ? -1 : start_pos + relative_space_pos;
+    int space_pos;
+    if ((space_pos = first_unquoted_space(user_command + start_pos)) != -1) {
+      space_pos += start_pos;
+    }
 
     if (space_pos == -1) {
       // If there are no spaces after the current start position, add the rest
@@ -437,6 +497,12 @@ int execute_command(char** parsed_command) {
         perror("waitpid error in execute_command()");
         return EXECUTE_FAILURE;
       }
+    } else {
+      // Add child process to background process array.
+      if (append_bg_process(process_id) == CLEAR_BG_FAILURE) {
+        return EXECUTE_FAILURE;
+      }
+      printf("Started background process %d\n", process_id);
     }
   }
 

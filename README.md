@@ -19,6 +19,8 @@ This project is a simple custom shell designed to provide basic command-line fun
 * Built-in `cd` command to change current working directory in the shell session
 * Signal handling to respond to the Ctrl+C interrupt without terminating
 * User-configurable shell prompt via built-in command `prompt`
+* Built-in `jobs` command to display active background processes
+* Built-in `fg` command to bring a background process to the foreground
 * Detailed error messaging/handling
 
 ## Contact

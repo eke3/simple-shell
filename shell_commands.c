@@ -8,7 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <sys/wait.h>
+
+#include "bg_utils.h"
 
 int change_directory(char** parsed_command) {
   // Check for number of arguments.
@@ -62,17 +64,19 @@ int change_shell_prompt(char** parsed_command) {
 }
 
 int execute_proc_command(char* proc_file_path) {
+  FILE* proc_file;
+
   // Try to open the proc file.
-  FILE* proc_file = fopen(proc_file_path, "r");
-  if (proc_file == NULL) {
+  if ((proc_file = fopen(proc_file_path, "r")) == NULL) {
     perror("fopen error in execute_proc_command()");
     return EXEC_PROC_FAILURE;
   }
 
-  // Read and print the contents of the proc file.
   char* line = NULL;
   size_t proc_file_length = 0;
+
   while (getline(&line, &proc_file_length, proc_file) != -1) {
+    // Read and print the contents of the proc file.
     printf("%s", line);
   }
 
@@ -81,11 +85,67 @@ int execute_proc_command(char* proc_file_path) {
   return 0;
 }
 
+int foreground_process(pid_t process_id) {
+  if (process_id <= 0) {
+    // Process id is not an integer greater than 0.
+    fprintf(stderr, "Invalid process id %d. Enter an id greater than 0.\n",
+            process_id);
+    return FG_FAILURE;
+  }
+
+  // Check if process exists among background processes.
+  int process_exists = 0;
+  for (int i = 0; i < bg_processes->capacity; i++) {
+    if (bg_processes->process_ids[i] == process_id) {
+      process_exists = 1;
+      break;
+    }
+  }
+
+  if (!process_exists) {
+    // Specified process does not exist among background processes.
+    fprintf(stderr, "Process with id %d does not exist.\n", process_id);
+  } else {
+    // Foreground process and remove from list of background processes.
+    if (remove_bg_process(process_id) == REMOVE_BG_FAILURE) {
+      fprintf(stderr, "Error removing process %d from background processes.\n",
+              process_id);
+    }
+    int status;
+    if (waitpid(process_id, &status, 0) == -1) {
+      perror("waitpid error in foreground_process()");
+    }
+  }
+
+  return 0;
+}
+
+int list_bg_processes(void) {
+  if (bg_processes == NULL) {
+    // Global struct not initialized.
+    return BG_FAILURE;
+  } else {
+    // List active background processes.
+    if (bg_processes->num_processes == 0) {
+      printf("No active background processes.\n");
+    } else {
+      for (int i = 0, cnt = 1; i < bg_processes->capacity; i++) {
+        if (bg_processes->process_ids[i] > DEAD_PROCESS_ID) {
+          printf("[%d]\t%d\n", cnt, bg_processes->process_ids[i]);
+          cnt++;
+        }
+      }
+    }
+  }
+  return 0;
+}
+
 int print_history() {
+  FILE* history_file;
+
   // Try to open the history file.
-  FILE* history_file = fopen(history_file_path, "r");
-  if (history_file == NULL) {
-    perror("error opening .421sh history file");
+  if ((history_file = fopen(history_file_path, "r")) == NULL) {
+    perror("fopen error in print_history()");
     return PRINT_FAILURE;
   }
 
@@ -101,6 +161,7 @@ int print_history() {
     }
     // Store the line.
     lines[line_count % MAX_HISTORY_LINES] = strdup(line);
+
     line_count++;
   }
 

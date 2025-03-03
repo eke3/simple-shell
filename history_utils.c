@@ -2,7 +2,7 @@
 // Author:  Eric Ekey
 // Date:    2/22/2025
 // Desc:    This file contains utility functions for managing the shell's
-// command history.
+//          command history.
 
 #include "history_utils.h"
 
@@ -15,7 +15,7 @@ int append_history(const char* command) {
 
   // Open history file in append mode.
   if ((history_file = fopen(history_file_path, "a")) == NULL) {
-    perror("error opening .421sh history file");
+    perror("fopen error in append_history()");
     return APPEND_FAILURE;
   };
 
@@ -30,7 +30,7 @@ int clear_history() {
 
   // Opening in write mode clears the file. Check for unsuccessful open.
   if ((history_file = fopen(history_file_path, "w")) == NULL) {
-    perror("error opening .421sh history file");
+    perror("fopen error in clear_history()");
     return CLEAR_FAILURE;
   }
 
