@@ -1,4 +1,4 @@
-# CMSC 421 Project 1
+# Simple Shell
 
 ## Introduction
 **Platforms** - Linux
@@ -13,8 +13,6 @@ This project is a simple custom shell designed to provide basic command-line fun
 * Built-in `/proc` command to display file content from the proc filesystem
 * Built-in `history` command to display the last ten commands entered in the session
 * Memory management to prevent leaks and errors
-
-**Extra Credit Features**
 * Background process execution by passing `&` as the last argument to a command
 * Built-in `cd` command to change current working directory in the shell session
 * Signal handling to respond to the Ctrl+C interrupt without terminating
@@ -23,10 +21,6 @@ This project is a simple custom shell designed to provide basic command-line fun
 * Built-in `fg` command to bring a background process to the foreground
 * Detailed error messaging/handling
 
-## Contact
-* **Contributor** - Eric Ekey
-* **Student ID** - XR06051
-* **Email** - eekey1@umbc.edu
 
 ## Installation and Setup
 ### Setup
